@@ -2869,10 +2869,26 @@ func (s *containerStats) Display(w io.Writer) error {
 
 func (cli *DockerCli) CmdStats(args ...string) error {
 	cmd := cli.Subcmd("stats", "CONTAINER [CONTAINER...]", "Display a live stream of one or more containers' resource usage statistics", true)
-	cmd.Require(flag.Min, 1)
+	cmd.Require(flag.Min, 0)
 	utils.ParseFlags(cmd, args, true)
 
-	names := cmd.Args()
+	var names []string
+	if len(args) > 0 {
+		names = cmd.Args()
+	} else {
+		body, _, err := readBody(cli.call("GET", "/containers/json", nil, false))
+		if err != nil {
+			return err
+		}
+		var containers []struct{ ID string }
+		if err := json.Unmarshal(body, &containers); err != nil {
+			return err
+		}
+		names = make([]string, len(containers))
+		for i, item := range containers {
+			names[i] = item.ID[:12]
+		}
+	}
 	sort.Strings(names)
 	var (
 		cStats []*containerStats
